@@ -11,7 +11,11 @@ fn main() {
         .header("wrapper.h")
         .allowlist_function("sodium_init")
         .allowlist_function("crypto_generichash")
+        .allowlist_function("crypto_generichash_init")
+        .allowlist_function("crypto_generichash_update")
+        .allowlist_function("crypto_generichash_final")
         .allowlist_var("^(crypto_generichash_(K|B).*)$")
+        .allowlist_type("crypto_generichash_state")
         .generate()
         .unwrap();
 

@@ -9,6 +9,4 @@ edition = "2021"
 
 [build-dependencies]
 bindgen = "0.65.1"
-cc = "1.0.79"
 pkg-config = "0.3.27"
-regex = "1.8.1"
