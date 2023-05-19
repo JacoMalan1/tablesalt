@@ -22,39 +22,36 @@ impl Sodium {
 
     /// This function takes in a message and a key and returns a hash of the message
     /// with the key.
-    pub fn crypto_generichash<const HASH_SIZE: usize>(
-        self,
-        msg: impl AsRef<[u8]>,
-        key: impl AsRef<[u8]>,
-    ) -> Box<dyn AsRef<[u8]>> {
+    pub fn crypto_generichash(self, msg: &[u8], key: Option<&[u8]>, hash_len: usize) -> Vec<u8> {
         // Panic if any of the buffer sizes is outside the allowed range
-        assert!(HASH_SIZE >= usize::try_from(ffi::crypto_generichash_BYTES_MIN).unwrap());
-        assert!(HASH_SIZE <= usize::try_from(ffi::crypto_generichash_BYTES_MAX).unwrap());
+        assert!(hash_len >= usize::try_from(ffi::crypto_generichash_BYTES_MIN).unwrap());
+        assert!(hash_len <= usize::try_from(ffi::crypto_generichash_BYTES_MAX).unwrap());
         assert!(
-            key.as_ref().len() <= usize::try_from(ffi::crypto_generichash_KEYBYTES_MAX).unwrap()
+            key.unwrap_or(b"").len()
+                <= usize::try_from(ffi::crypto_generichash_KEYBYTES_MAX).unwrap()
         );
 
-        let mut buf = Vec::<u8>::with_capacity(HASH_SIZE);
+        let mut buf = Vec::<u8>::with_capacity(hash_len);
 
         // SAFETY: Since we have a self, libsodium must be initialized, so we can safely
         // call any libsodium functions.
         unsafe {
             ffi::crypto_generichash(
                 buf.as_mut_ptr(),
-                HASH_SIZE,
+                hash_len,
                 msg.as_ref().as_ptr(),
                 msg.as_ref().len() as u64,
-                key.as_ref().as_ptr(),
-                key.as_ref().len(),
+                key.unwrap_or(b"").as_ptr(),
+                key.unwrap_or(b"").len(),
             )
         };
 
         // SAFETY: The crypto_generichash function will write HASH_SIZE bytes
         // into the buffer, so we can assume that the memory contained there is initialized.
         unsafe {
-            buf.set_len(HASH_SIZE);
+            buf.set_len(hash_len);
         }
 
-        Box::new(buf)
+        buf
     }
 }
