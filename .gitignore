@@ -1,0 +1,4 @@
+/target
+/Cargo.lock
+libsodium_sys/target
+libsodium_sys/Cargo.lock
