@@ -15,6 +15,7 @@ fn main() {
         .allowlist_function("crypto_generichash_update")
         .allowlist_function("crypto_generichash_final")
         .allowlist_var("^(crypto_generichash_(K|B).*)$")
+        .allowlist_var("^(crypto_secretstream_.*)$")
         .allowlist_type("crypto_generichash_state")
         .generate()
         .unwrap();
