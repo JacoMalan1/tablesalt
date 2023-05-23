@@ -63,4 +63,21 @@ mod tests {
         let s = sodium::Sodium::new();
         let _ = s.crypto_generichash(b"Some message!", Some(&[0u8; 65]), 32);
     }
+
+    #[test]
+    fn test_thread_safety() {
+        let s = sodium::Sodium::new();
+        let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
+        let handle = std::thread::spawn(move || {
+            let hash = s.crypto_generichash(b"Some message!", None, 32);
+            tx.send(hash).unwrap();
+        });
+
+        let hash = rx.recv().unwrap();
+        handle.join().unwrap();
+        assert_eq!(
+            hex::encode(hash.as_slice()),
+            "1e28ae8e58437cedd2bf3cad27d9d7c5ab454014d39ed893c25bc2ae2807b031"
+        );
+    }
 }

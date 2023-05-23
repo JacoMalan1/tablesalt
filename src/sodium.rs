@@ -1,16 +1,27 @@
-use std::mem::MaybeUninit;
+use std::{marker::PhantomData, mem::MaybeUninit, rc::Rc};
 
 use libsodium_sys::ffi;
 
 #[non_exhaustive]
 #[derive(Copy, Clone, Debug)]
+/// A handle to the libsodium api
+///
+/// # Thread Safety
+/// This struct implements is both `Send` and `Sync`.
+/// This is because we know that if there exists at least one
+/// reference to one of these objects, libsodium has been initialized
+/// and may be used.
 pub struct Sodium {
-    _priv: u8,
+    phantom: PhantomData<()>,
 }
 
 #[allow(clippy::new_without_default)]
 impl Sodium {
     /// Initializes libsodium
+    /// This function may be called multiple times and from different threads.
+    ///
+    /// # Returns
+    /// A `Sodium` object. This type is both `Send` and `Sync`
     pub fn new() -> Self {
         // SAFETY: We are allowed to init sodium multiple times and from
         // different threads. It is not supposed to crash and will always return
@@ -19,11 +30,22 @@ impl Sodium {
             panic!("Couldn't initialize libsodium!");
         }
 
-        Self { _priv: 0 }
+        Self {
+            phantom: PhantomData,
+        }
     }
 
     /// This function takes in a message and a key and returns a hash of the message
     /// with the key.
+    ///
+    /// # Returns
+    /// A `Vec<u8>` containing the hashed bytes for this message.
+    ///
+    /// # Panics
+    /// This function will panic if the passed in hash_len is less than
+    /// `libsodium_sys::ffi::crypto_generichash_BYTES_MIN` or greater than `libsodium_sys::ffi::crypto_generichash_BYTES_MAX`.
+    /// It will also panic if the length of the key is greater than
+    /// `libsodium_sys::ffi::crypto_generichash_KEYBYTES_MAX`
     pub fn crypto_generichash(self, msg: &[u8], key: Option<&[u8]>, hash_len: usize) -> Vec<u8> {
         // Panic if any of the buffer sizes is outside the allowed range
         assert!(hash_len >= usize::try_from(ffi::crypto_generichash_BYTES_MIN).unwrap());
@@ -57,6 +79,13 @@ impl Sodium {
         buf
     }
 
+    /// Creates a new multi-part crypto_generichash state.
+    ///
+    /// # Panics
+    /// This function will panic if the passed in hash_len is less than
+    /// `libsodium_sys::ffi::crypto_generichash_BYTES_MIN` or greater than `libsodium_sys::ffi::crypto_generichash_BYTES_MAX`.
+    /// It will also panic if the length of the key is greater than
+    /// `libsodium_sys::ffi::crypto_generichash_KEYBYTES_MAX`
     pub fn crypto_generichash_init(
         self,
         key: Option<&[u8]>,
@@ -87,6 +116,7 @@ impl Sodium {
         CryptoGenericHashState {
             hash_len,
             internal: state,
+            phantom: PhantomData,
         }
     }
 }
@@ -94,9 +124,11 @@ impl Sodium {
 pub struct CryptoGenericHashState {
     hash_len: usize,
     internal: Box<MaybeUninit<ffi::crypto_generichash_state>>,
+    phantom: PhantomData<Rc<u8>>,
 }
 
 impl CryptoGenericHashState {
+    /// Updates the hash with some input data.
     pub fn update(&mut self, input: &[u8]) {
         // SAFETY: Since we have an exclusive reference to self, we must have
         // initialized the state and so it is safe to pass a pointer to it into
@@ -111,6 +143,8 @@ impl CryptoGenericHashState {
         };
     }
 
+    /// Finalizes the hash, consuming self and returning a `Vec<u8>`
+    /// containing the output bytes.
     pub fn finalize(mut self) -> Vec<u8> {
         let mut buf = Vec::<u8>::with_capacity(self.hash_len);
 
