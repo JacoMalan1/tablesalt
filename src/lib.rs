@@ -63,4 +63,17 @@ mod tests {
         let s = sodium::Sodium::new();
         let _ = s.crypto_generichash(b"Some message!", Some(&[0u8; 65]), 32);
     }
+
+    #[test]
+    fn test_secretstream_keygen() {
+        let s = sodium::Sodium::new();
+        let key = s.crypto_secretstream_xchacha20poly1305_keygen();
+
+        println!("Generated Key: {}", hex::encode(&key));
+
+        // Key will be dropped here anyway, but we're
+        // trying to bey explicit about the fact that the key bytes
+        // should be deallocated by Rust.
+        drop(key);
+    }
 }

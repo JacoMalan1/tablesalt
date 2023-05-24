@@ -89,6 +89,43 @@ impl Sodium {
             internal: state,
         }
     }
+
+    pub fn crypto_secretstream_xchacha20poly1305_keygen(self) -> CryptoSecretStreamKey {
+        let mut buffer = Vec::<MaybeUninit<u8>>::with_capacity(
+            ffi::crypto_secretstream_xchacha20poly1305_KEYBYTES as usize,
+        );
+
+        // SAFETY: crypto_secretstream_..._keygen should initialize the buffer.
+        // It is therefore safe to set it to the length of crypto_secretstream_..._KEYBYTES
+        unsafe {
+            ffi::crypto_secretstream_xchacha20poly1305_keygen(buffer.as_mut_ptr() as *mut u8);
+            buffer.set_len(ffi::crypto_secretstream_xchacha20poly1305_KEYBYTES as usize);
+        };
+
+        // SAFETY: See safety for the above unsafe block.
+        // (This buffer should be initialized)
+        let buffer = buffer.iter().map(|b| unsafe { b.assume_init() }).collect();
+        CryptoSecretStreamKey::new(buffer)
+    }
+
+    pub fn crypto_secretstream_
+}
+
+#[derive(Debug, Clone)]
+pub struct CryptoSecretStreamKey {
+    _buffer: Vec<u8>,
+}
+
+impl CryptoSecretStreamKey {
+    fn new(buffer: Vec<u8>) -> Self {
+        Self { _buffer: buffer }
+    }
+}
+
+impl AsRef<[u8]> for CryptoSecretStreamKey {
+    fn as_ref(&self) -> &[u8] {
+        &self._buffer
+    }
 }
 
 pub struct CryptoGenericHashState {
@@ -130,4 +167,8 @@ impl CryptoGenericHashState {
 
         buf
     }
+}
+
+pub struct CryptoSecretStreamState {
+    internal: *mut ffi::crypto_secretstream_xchacha20poly1305_state,
 }
