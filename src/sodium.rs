@@ -1,6 +1,5 @@
-use std::{marker::PhantomData, mem::MaybeUninit, rc::Rc};
-
 use libsodium_sys::ffi;
+use std::{marker::PhantomData, mem::MaybeUninit, rc::Rc};
 
 #[non_exhaustive]
 #[derive(Copy, Clone, Debug)]
@@ -120,7 +119,7 @@ impl Sodium {
         }
     }
 
-    pub fn crypto_secretstream_xchacha20poly1305_keygen(self) -> CryptoSecretStreamKey {
+    pub fn crypto_secretstream_keygen(self) -> CryptoSecretStreamKey {
         let mut buffer = Vec::<MaybeUninit<u8>>::with_capacity(
             ffi::crypto_secretstream_xchacha20poly1305_KEYBYTES as usize,
         );
@@ -136,6 +135,61 @@ impl Sodium {
         // (This buffer should be initialized)
         let buffer = buffer.iter().map(|b| unsafe { b.assume_init() }).collect();
         CryptoSecretStreamKey::new(buffer)
+    }
+
+    pub fn crypto_secretstream_init_push(
+        self,
+        key: CryptoSecretStreamKey,
+    ) -> CryptoSecretStreamPush {
+        let mut state = Box::<MaybeUninit<ffi::crypto_secretstream_xchacha20poly1305_state>>::new(
+            MaybeUninit::uninit(),
+        );
+
+        let mut header = Vec::<MaybeUninit<u8>>::with_capacity(
+            ffi::crypto_secretstream_xchacha20poly1305_HEADERBYTES as usize,
+        );
+
+        // SAFETY: crypto_secretstream_..._init_push should initialize the state and
+        // the header. We know it will push the specified number of bytes into
+        // the vector, so it is safe to set it's length to that.
+        let header = unsafe {
+            ffi::crypto_secretstream_xchacha20poly1305_init_push(
+                state.as_mut_ptr(),
+                header.as_mut_ptr() as *mut u8,
+                key._buffer.as_ptr(),
+            );
+            header.set_len(ffi::crypto_secretstream_xchacha20poly1305_HEADERBYTES as usize);
+            header.iter().map(|b| b.assume_init()).collect()
+        };
+
+        CryptoSecretStreamPush {
+            internal: state,
+            header,
+            _phantom: PhantomData,
+        }
+    }
+
+    pub fn crypto_secretstream_init_pull(
+        self,
+        header: Vec<u8>,
+        key: CryptoSecretStreamKey,
+    ) -> CryptoSecretStreamPull {
+        let mut state = Box::<MaybeUninit<ffi::crypto_secretstream_xchacha20poly1305_state>>::new(
+            MaybeUninit::uninit(),
+        );
+
+        unsafe {
+            ffi::crypto_secretstream_xchacha20poly1305_init_pull(
+                state.as_mut_ptr(),
+                header.as_ptr(),
+                key._buffer.as_ptr(),
+            )
+        };
+
+        CryptoSecretStreamPull {
+            internal: state,
+            _phantom: PhantomData,
+        }
     }
 }
 
@@ -201,6 +255,100 @@ impl CryptoGenericHashState {
     }
 }
 
-pub struct CryptoSecretStreamState {
-    internal: *mut ffi::crypto_secretstream_xchacha20poly1305_state,
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum SecretStreamTag {
+    Message = 0,
+    Push = 1,
+    Rekey = 2,
+    Final = 3,
+}
+
+impl From<u8> for SecretStreamTag {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => Self::Message,
+            1 => Self::Push,
+            2 => Self::Rekey,
+            3 => Self::Final,
+            _ => panic!("Invalid stream tag!"),
+        }
+    }
+}
+
+pub struct CryptoSecretStreamPush {
+    internal: Box<MaybeUninit<ffi::crypto_secretstream_xchacha20poly1305_state>>,
+    header: Vec<u8>,
+    _phantom: PhantomData<Rc<u8>>,
+}
+
+impl CryptoSecretStreamPush {
+    pub fn push(&mut self, msg: &[u8], tag: SecretStreamTag) -> Vec<u8> {
+        // SAFETY: Since we have a &mut self, there must exist a Sodium somewhere so libsodium
+        // has been initialized
+        assert!(
+            msg.len() <= unsafe { ffi::crypto_secretstream_xchacha20poly1305_messagebytes_max() }
+        );
+
+        let mut ciphertext = Vec::<MaybeUninit<u8>>::with_capacity(
+            msg.len() + ffi::crypto_secretstream_xchacha20poly1305_ABYTES as usize,
+        );
+
+        // SAFETY: We know that this function should produce msg.len() + ...ABYTES of data.
+        // It is therefore safe to assume that ciphertext is fully initialized.
+        unsafe {
+            ffi::crypto_secretstream_xchacha20poly1305_push(
+                self.internal.as_mut_ptr(),
+                ciphertext.as_mut_ptr() as *mut u8,
+                std::ptr::null_mut(),
+                msg.as_ptr(),
+                msg.len().try_into().unwrap(),
+                std::ptr::null(),
+                0,
+                tag as u8,
+            );
+            ciphertext
+                .set_len(msg.len() + ffi::crypto_secretstream_xchacha20poly1305_ABYTES as usize);
+            ciphertext.iter().map(|b| b.assume_init()).collect()
+        }
+    }
+
+    pub fn header(&self) -> &Vec<u8> {
+        &self.header
+    }
+}
+
+pub struct CryptoSecretStreamPull {
+    internal: Box<MaybeUninit<ffi::crypto_secretstream_xchacha20poly1305_state>>,
+    _phantom: PhantomData<Rc<u8>>,
+}
+
+impl CryptoSecretStreamPull {
+    pub fn pull(&mut self, ciphertext: &[u8]) -> (Vec<u8>, SecretStreamTag) {
+        let mut msg = Vec::<MaybeUninit<u8>>::with_capacity(
+            ciphertext.len() - ffi::crypto_secretstream_xchacha20poly1305_ABYTES as usize,
+        );
+
+        let mut tag = 0u8;
+
+        unsafe {
+            ffi::crypto_secretstream_xchacha20poly1305_pull(
+                self.internal.as_mut_ptr(),
+                msg.as_mut_ptr() as *mut u8,
+                std::ptr::null_mut(),
+                std::ptr::addr_of_mut!(tag),
+                ciphertext.as_ptr(),
+                ciphertext.len().try_into().unwrap(),
+                std::ptr::null(),
+                0,
+            );
+
+            msg.set_len(
+                ciphertext.len() - ffi::crypto_secretstream_xchacha20poly1305_ABYTES as usize,
+            );
+            (
+                msg.iter().map(|b| b.assume_init()).collect(),
+                SecretStreamTag::from(tag),
+            )
+        }
+    }
 }

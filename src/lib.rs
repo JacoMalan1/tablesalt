@@ -2,6 +2,8 @@ pub mod sodium;
 
 #[cfg(test)]
 mod tests {
+    use crate::sodium::SecretStreamTag;
+
     use super::*;
 
     #[test]
@@ -67,7 +69,7 @@ mod tests {
     #[test]
     fn test_secretstream_keygen() {
         let s = sodium::Sodium::new();
-        let key = s.crypto_secretstream_xchacha20poly1305_keygen();
+        let key = s.crypto_secretstream_keygen();
 
         println!("Generated Key: {}", hex::encode(&key));
 
@@ -77,6 +79,7 @@ mod tests {
         drop(key);
     }
 
+    #[test]
     fn test_thread_safety() {
         let s = sodium::Sodium::new();
         let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
@@ -91,5 +94,29 @@ mod tests {
             hex::encode(hash.as_slice()),
             "1e28ae8e58437cedd2bf3cad27d9d7c5ab454014d39ed893c25bc2ae2807b031"
         );
+    }
+
+    #[test]
+    fn test_secretstream() {
+        let s = sodium::Sodium::new();
+        let key = s.crypto_secretstream_keygen();
+        let mut state = s.crypto_secretstream_init_push(key.clone());
+        let c1 = state.push(b"Hello, ", SecretStreamTag::Message);
+        let c2 = state.push(b"World!", SecretStreamTag::Final);
+
+        println!("Ciphertext 1: {}", hex::encode(&c1));
+        println!("Ciphertext 2: {}", hex::encode(&c2));
+
+        let mut pull = s.crypto_secretstream_init_pull(state.header().clone(), key);
+        let (msg1, tag1) = pull.pull(&c1);
+        let (msg2, tag2) = pull.pull(&c2);
+
+        println!("Message 1: {}", String::from_utf8(msg1.clone()).unwrap());
+        println!("Message 2: {}", String::from_utf8(msg2.clone()).unwrap());
+
+        assert_eq!(msg1, b"Hello, ");
+        assert_eq!(msg2, b"World!");
+        assert_eq!(tag1, SecretStreamTag::Message);
+        assert_eq!(tag2, SecretStreamTag::Final);
     }
 }
