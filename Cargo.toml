@@ -1,0 +1,16 @@
+[package]
+name = "tablesalt"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "A safe, oxidized wrapper for libsodium"
+homepage = "https://github.com/JacoMalan1/tablesalt"
+repository = "https://github.com/JacoMalan1/tablesalt"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+libsodium-sys = { version = "0.2.7", features = ["use-pkg-config"] }
+
+[dev-dependencies]
+hex = "0.4.3"
