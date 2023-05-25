@@ -2,9 +2,8 @@ pub mod sodium;
 
 #[cfg(test)]
 mod tests {
-    use crate::sodium::SecretStreamTag;
-
     use super::*;
+    use crate::sodium::SecretStreamTag;
 
     #[test]
     fn test_init_sodium() {
@@ -107,7 +106,9 @@ mod tests {
         println!("Ciphertext 1: {}", hex::encode(&c1));
         println!("Ciphertext 2: {}", hex::encode(&c2));
 
-        let mut pull = s.crypto_secretstream_init_pull(state.header().clone(), key);
+        let mut pull = s
+            .crypto_secretstream_init_pull(state.header().clone(), key)
+            .unwrap();
         let (msg1, tag1) = pull.pull(&c1);
         let (msg2, tag2) = pull.pull(&c2);
 
