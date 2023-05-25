@@ -1,4 +1,4 @@
-use libsodium_sys::ffi;
+use libsodium_sys as ffi;
 use std::{marker::PhantomData, mem::MaybeUninit, rc::Rc};
 
 #[non_exhaustive]

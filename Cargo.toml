@@ -10,7 +10,7 @@ repository = "https://github.com/JacoMalan1/tablesalt"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-libsodium-sys = { path = "libsodium_sys", version = "0.1.0" }
+libsodium-sys = { version = "0.2.7", features = ["use-pkg-config"] }
 
 [dev-dependencies]
 hex = "0.4.3"
