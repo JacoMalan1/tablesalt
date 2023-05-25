@@ -42,7 +42,7 @@ fn main() {
     let mut state = s.crypto_generichash_init(None, 32);
     state.update(b"Some ");
     state.update(b"message");
-    let hash = state.final();
+    let hash = state.finalize();
 
     println!("blake2b hash: {}", hex::encode(&hash));
 }

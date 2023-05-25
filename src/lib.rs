@@ -1,3 +1,32 @@
+//! A safe, oxidized wrapper for libsodium.
+//!
+//! # Hashing a message
+//! ```rust
+//! use tablesalt::sodium;
+//!
+//! fn main() {
+//!     let s = sodium::Sodium::new();
+//!     let hash = s.crypto_generichash(b"Some message", None, 32);
+//!
+//!     println!("blake2b hash: {}", hex::encode(&hash));
+//! }
+//! ```
+//!
+//! # Hashing a multi-part message.
+//! ```rust
+//! use tablesalt::sodium;
+//!
+//! fn main() {
+//!     let s = sodium::Sodium::new();
+//!     let mut state = s.crypto_generichash_init(None, 32);
+//!     state.update(b"Some ");
+//!     state.update(b"message");
+//!     let hash = state.finalize();
+//!
+//!     println!("blake2b hash: {}", hex::encode(&hash));
+//! }
+//! ```
+
 pub mod sodium;
 
 #[cfg(test)]
