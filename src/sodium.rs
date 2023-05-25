@@ -42,9 +42,9 @@ impl Sodium {
     ///
     /// # Panics
     /// This function will panic if the passed in hash_len is less than
-    /// [`libsodium_sys::ffi::crypto_generichash_BYTES_MIN`] or greater than [`libsodium_sys::ffi::crypto_generichash_BYTES_MAX`].
+    /// [`ffi::crypto_generichash_BYTES_MIN`] or greater than [`ffi::crypto_generichash_BYTES_MAX`].
     /// It will also panic if the length of the key is greater than
-    /// [`libsodium_sys::ffi::crypto_generichash_KEYBYTES_MAX`]
+    /// [`ffi::crypto_generichash_KEYBYTES_MAX`]
     pub fn crypto_generichash(self, msg: &[u8], key: Option<&[u8]>, hash_len: usize) -> Vec<u8> {
         // Panic if any of the buffer sizes is outside the allowed range
         assert!(hash_len >= usize::try_from(ffi::crypto_generichash_BYTES_MIN).unwrap());
@@ -82,9 +82,9 @@ impl Sodium {
     ///
     /// # Panics
     /// This function will panic if the passed in hash_len is less than
-    /// [`libsodium_sys::ffi::crypto_generichash_BYTES_MIN`] or greater than [`libsodium_sys::ffi::crypto_generichash_BYTES_MAX`].
+    /// [`ffi::crypto_generichash_BYTES_MIN`] or greater than [`ffi::crypto_generichash_BYTES_MAX`].
     /// It will also panic if the length of the key is greater than
-    /// [`libsodium_sys::ffi::crypto_generichash_KEYBYTES_MAX`]
+    /// [`ffi::crypto_generichash_KEYBYTES_MAX`]
     pub fn crypto_generichash_init(
         self,
         key: Option<&[u8]>,
