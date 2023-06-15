@@ -13,7 +13,7 @@ TableSalt is a safe, oxidized wrapper for libsodium.
 To use tablesalt, add start by adding it as a dependency in your `Cargo.toml` file.
 ```toml
 [dependencies]
-tablesalt = "0.1.0"
+tablesalt = "0.2.0"
 ```
 
 ## Hashing
