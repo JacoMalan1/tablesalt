@@ -1,5 +1,5 @@
 use libsodium_sys as ffi;
-use std::{marker::PhantomData, mem::MaybeUninit, rc::Rc};
+use std::{ffi::CString, marker::PhantomData, mem::MaybeUninit, rc::Rc};
 
 #[non_exhaustive]
 #[derive(Copy, Clone, Debug)]
@@ -224,6 +224,61 @@ impl Sodium {
             internal: state,
             _phantom: PhantomData,
         })
+    }
+
+    /// Generates a master key for use in crypto_kdf_derive_from_key.
+    ///
+    /// # Returns
+    /// A [`Vec<u8>`] containing the generated master key.
+    pub fn crypto_kdf_keygen(self) -> Vec<u8> {
+        let mut result = Vec::<u8>::with_capacity(ffi::crypto_kdf_KEYBYTES as usize);
+
+        // SAFETY: We know that crypto_kdf_keygen will write crypto_kdf_KEYBYTES into
+        // result, so it is safe to set it's length to that.
+        unsafe {
+            ffi::crypto_kdf_keygen(result.as_mut_ptr());
+            result.set_len(ffi::crypto_kdf_KEYBYTES as usize);
+        }
+
+        result
+    }
+
+    /// Derives a subkey from a master key and context.
+    ///
+    /// # Panics
+    ///  - Panics if the provided `subkey_len` is not in the range (16..=64).
+    ///  - Panics if `master_key.len() != libsodium_sys::crypto_kdf_KEYBYTES`.
+    ///
+    ///
+    /// # Returns
+    /// A [`Vec<u8>`] containing the derived subkey.
+    pub fn crypto_kdf_derive_from_key(
+        self,
+        master_key: &[u8],
+        context: &str,
+        subkey_id: u64,
+        subkey_len: usize,
+    ) -> Vec<u8> {
+        assert!(subkey_len >= 16 && subkey_len <= 64);
+        assert!(master_key.len() == ffi::crypto_kdf_KEYBYTES as usize);
+
+        let mut result = Vec::<u8>::with_capacity(subkey_len as usize);
+
+        let ctx = CString::new(context).unwrap();
+
+        // SAFETY: See safety for Sodium::crypto_kdf_keygen.
+        unsafe {
+            ffi::crypto_kdf_derive_from_key(
+                result.as_mut_ptr(),
+                subkey_len,
+                subkey_id,
+                ctx.as_ptr(),
+                master_key.as_ptr(),
+            );
+            result.set_len(subkey_len);
+        }
+
+        result
     }
 }
 
