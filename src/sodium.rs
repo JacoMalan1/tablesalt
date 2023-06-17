@@ -255,7 +255,7 @@ impl Sodium {
     pub fn crypto_kdf_derive_from_key(
         self,
         master_key: &[u8],
-        context: &str,
+        context: &[u8; ffi::crypto_kdf_CONTEXTBYTES as usize],
         subkey_id: u64,
         subkey_len: usize,
     ) -> Vec<u8> {
@@ -264,7 +264,7 @@ impl Sodium {
 
         let mut result = Vec::<u8>::with_capacity(subkey_len as usize);
 
-        let ctx = CString::new(context).unwrap();
+        let ctx = CString::new(context.as_ref()).unwrap();
 
         // SAFETY: See safety for Sodium::crypto_kdf_keygen.
         unsafe {
