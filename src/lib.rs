@@ -4,27 +4,23 @@
 //! ```rust
 //! use tablesalt::sodium;
 //!
-//! fn main() {
-//!     let s = sodium::Sodium::new();
-//!     let hash = s.crypto_generichash(b"Some message", None, 32);
+//! let s = sodium::Sodium::new();
+//! let hash = s.crypto_generichash(b"Some message", None, 32);
 //!
-//!     println!("blake2b hash: {}", hex::encode(&hash));
-//! }
+//! println!("blake2b hash: {}", hex::encode(&hash));
 //! ```
 //!
 //! # Hashing a multi-part message.
 //! ```rust
 //! use tablesalt::sodium;
+//!     
+//! let s = sodium::Sodium::new();
+//! let mut state = s.crypto_generichash_init(None, 32);
+//! state.update(b"Some ");
+//! state.update(b"message");
+//! let hash = state.finalize();
 //!
-//! fn main() {
-//!     let s = sodium::Sodium::new();
-//!     let mut state = s.crypto_generichash_init(None, 32);
-//!     state.update(b"Some ");
-//!     state.update(b"message");
-//!     let hash = state.finalize();
-//!
-//!     println!("blake2b hash: {}", hex::encode(&hash));
-//! }
+//! println!("blake2b hash: {}", hex::encode(&hash));
 //! ```
 
 pub mod sodium;
@@ -53,7 +49,7 @@ mod tests {
     fn test_crypto_generichash_with_key() {
         let hash = sodium::Sodium::new().crypto_generichash(b"Some message!", Some(b"key"), 64);
         assert_eq!(
-            hex::encode(&hash),
+            hex::encode(hash),
             concat!(
                 "6368da700e596f77afc013867dd108a9f442c4d56b7a55d6cd4943303aef461",
                 "9f0148de2ae7948a901a1147c57e3ec0faf69bf021e3e50a537462760fbca3615"
@@ -153,20 +149,19 @@ mod tests {
     #[test]
     fn test_generate_master_key() {
         let s = sodium::Sodium::new();
-        let key = s.crypto_kdf_keygen();
+        let key = s.crypto_kdf_keygen(b"Examples");
         println!("Key: {}", hex::encode(key));
     }
 
     #[test]
     fn test_generate_subkey() {
         let s = sodium::Sodium::new();
-        let ctx = String::from("Some context");
-        let key = s.crypto_kdf_keygen();
+        let key = s.crypto_kdf_keygen(b"Examples");
         println!("Master Key: {}", hex::encode(&key));
 
-        let s1 = s.crypto_kdf_derive_from_key(&key, &ctx, 1, 16);
-        let s2 = s.crypto_kdf_derive_from_key(&key, &ctx, 2, 32);
-        let s3 = s.crypto_kdf_derive_from_key(&key, &ctx, 3, 64);
+        let s1 = key.derive_subkey(1, 16);
+        let s2 = key.derive_subkey(2, 32);
+        let s3 = key.derive_subkey(3, 64);
 
         assert_eq!(s1.len(), 16);
         assert_eq!(s2.len(), 32);
@@ -177,21 +172,19 @@ mod tests {
     #[should_panic]
     fn test_subkey_too_short() {
         let s = sodium::Sodium::new();
-        let ctx = String::from("Some context");
-        let key = s.crypto_kdf_keygen();
+        let key = s.crypto_kdf_keygen(b"Examples");
         println!("Master Key: {}", hex::encode(&key));
 
-        let _ = s.crypto_kdf_derive_from_key(&key, &ctx, 1, 15);
+        let _ = key.derive_subkey(1, 15);
     }
 
     #[test]
     #[should_panic]
     fn test_subkey_too_long() {
         let s = sodium::Sodium::new();
-        let ctx = String::from("Some context");
-        let key = s.crypto_kdf_keygen();
+        let key = s.crypto_kdf_keygen(b"Examples");
         println!("Master Key: {}", hex::encode(&key));
 
-        let _ = s.crypto_kdf_derive_from_key(&key, &ctx, 1, 65);
+        let _ = key.derive_subkey(1, 65);
     }
 }
