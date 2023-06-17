@@ -160,13 +160,12 @@ mod tests {
     #[test]
     fn test_generate_subkey() {
         let s = sodium::Sodium::new();
-        let ctx = String::from("Some context");
         let key = s.crypto_kdf_keygen();
         println!("Master Key: {}", hex::encode(&key));
 
-        let s1 = s.crypto_kdf_derive_from_key(&key, &ctx, 1, 16);
-        let s2 = s.crypto_kdf_derive_from_key(&key, &ctx, 2, 32);
-        let s3 = s.crypto_kdf_derive_from_key(&key, &ctx, 3, 64);
+        let s1 = s.crypto_kdf_derive_from_key(&key, b"Examples", 1, 16);
+        let s2 = s.crypto_kdf_derive_from_key(&key, b"Examples", 2, 32);
+        let s3 = s.crypto_kdf_derive_from_key(&key, b"Examples", 3, 64);
 
         assert_eq!(s1.len(), 16);
         assert_eq!(s2.len(), 32);
@@ -177,21 +176,19 @@ mod tests {
     #[should_panic]
     fn test_subkey_too_short() {
         let s = sodium::Sodium::new();
-        let ctx = String::from("Some context");
         let key = s.crypto_kdf_keygen();
         println!("Master Key: {}", hex::encode(&key));
 
-        let _ = s.crypto_kdf_derive_from_key(&key, &ctx, 1, 15);
+        let _ = s.crypto_kdf_derive_from_key(&key, b"Examples", 1, 15);
     }
 
     #[test]
     #[should_panic]
     fn test_subkey_too_long() {
         let s = sodium::Sodium::new();
-        let ctx = String::from("Some context");
         let key = s.crypto_kdf_keygen();
         println!("Master Key: {}", hex::encode(&key));
 
-        let _ = s.crypto_kdf_derive_from_key(&key, &ctx, 1, 65);
+        let _ = s.crypto_kdf_derive_from_key(&key, b"Examples", 1, 65);
     }
 }
