@@ -1,5 +1,5 @@
 use libsodium_sys as ffi;
-use std::{ffi::CString, marker::PhantomData, mem::MaybeUninit, rc::Rc};
+use std::{marker::PhantomData, mem::MaybeUninit, rc::Rc};
 
 #[non_exhaustive]
 #[derive(Copy, Clone, Debug)]
@@ -147,16 +147,14 @@ impl Sodium {
     /// ```rust
     /// use tablesalt::sodium::{self, SecretStreamTag};
     ///
-    /// fn main() {
-    ///     let s = sodium::Sodium::new();
-    ///     let key = s.crypto_secretstream_keygen();
-    ///     let mut stream = s.crypto_secretstream_init_push(key);
-    ///     let ciphertext1 = stream.push(b"Hello, ", SecretStreamTag::Message);
-    ///     let ciphertext2 = stream.push(b"World!", SecretStreamTag::Final);
+    /// let s = sodium::Sodium::new();
+    /// let key = s.crypto_secretstream_keygen();
+    /// let mut stream = s.crypto_secretstream_init_push(key);
+    /// let ciphertext1 = stream.push(b"Hello, ", SecretStreamTag::Message);
+    /// let ciphertext2 = stream.push(b"World!", SecretStreamTag::Final);
     ///
-    ///     println!("Ciphertext 1: {}", hex::encode(&ciphertext1));
-    ///     println!("Ciphertext 2: {}", hex::encode(&ciphertext2));
-    /// }
+    /// println!("Ciphertext 1: {}", hex::encode(&ciphertext1));
+    /// println!("Ciphertext 2: {}", hex::encode(&ciphertext2));
     /// ```
     pub fn crypto_secretstream_init_push(
         self,
@@ -230,41 +228,44 @@ impl Sodium {
     ///
     /// # Returns
     /// A [`Vec<u8>`] containing the generated master key.
-    pub fn crypto_kdf_keygen(self) -> Vec<u8> {
-        let mut result = Vec::<u8>::with_capacity(ffi::crypto_kdf_KEYBYTES as usize);
+    pub fn crypto_kdf_keygen(
+        self,
+        context: &[u8; ffi::crypto_kdf_CONTEXTBYTES as usize],
+    ) -> KdfMasterKey {
+        let mut buffer = MaybeUninit::new([0u8; ffi::crypto_kdf_KEYBYTES as usize]);
 
         // SAFETY: We know that crypto_kdf_keygen will write crypto_kdf_KEYBYTES into
-        // result, so it is safe to set it's length to that.
-        unsafe {
-            ffi::crypto_kdf_keygen(result.as_mut_ptr());
-            result.set_len(ffi::crypto_kdf_KEYBYTES as usize);
+        // `buffer`, so it is safe to assume it is initialized.
+        let buffer = unsafe {
+            ffi::crypto_kdf_keygen(buffer.as_mut_ptr() as *mut u8);
+            buffer.assume_init()
+        };
+
+        KdfMasterKey {
+            internal: buffer,
+            context: *context,
         }
-
-        result
     }
+}
 
-    /// Derives a subkey from a master key and context.
+#[derive(Clone)]
+pub struct KdfMasterKey {
+    internal: [u8; ffi::crypto_kdf_KEYBYTES as usize],
+    context: [u8; ffi::crypto_kdf_CONTEXTBYTES as usize],
+}
+
+impl KdfMasterKey {
+    /// Derives a subkey from a master key.
     ///
     /// # Panics
     ///  - Panics if the provided `subkey_len` is not in the range (16..=64).
-    ///  - Panics if `master_key.len() != libsodium_sys::crypto_kdf_KEYBYTES`.
-    ///
     ///
     /// # Returns
     /// A [`Vec<u8>`] containing the derived subkey.
-    pub fn crypto_kdf_derive_from_key(
-        self,
-        master_key: &[u8],
-        context: &str,
-        subkey_id: u64,
-        subkey_len: usize,
-    ) -> Vec<u8> {
-        assert!(subkey_len >= 16 && subkey_len <= 64);
-        assert!(master_key.len() == ffi::crypto_kdf_KEYBYTES as usize);
+    pub fn derive_subkey(&self, subkey_id: u64, subkey_len: usize) -> Vec<u8> {
+        assert!((16..=64).contains(&subkey_len));
 
-        let mut result = Vec::<u8>::with_capacity(subkey_len as usize);
-
-        let ctx = CString::new(context).unwrap();
+        let mut result = Vec::<u8>::with_capacity(subkey_len);
 
         // SAFETY: See safety for Sodium::crypto_kdf_keygen.
         unsafe {
@@ -272,13 +273,19 @@ impl Sodium {
                 result.as_mut_ptr(),
                 subkey_len,
                 subkey_id,
-                ctx.as_ptr(),
-                master_key.as_ptr(),
+                self.context.as_ptr() as *const i8,
+                self.internal.as_ptr(),
             );
             result.set_len(subkey_len);
         }
 
         result
+    }
+}
+
+impl AsRef<[u8]> for KdfMasterKey {
+    fn as_ref(&self) -> &[u8] {
+        &self.internal
     }
 }
 
