@@ -248,7 +248,7 @@ impl Sodium {
     }
 }
 
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 pub struct KdfMasterKey {
     internal: [u8; ffi::crypto_kdf_KEYBYTES as usize],
     context: [u8; ffi::crypto_kdf_CONTEXTBYTES as usize],
